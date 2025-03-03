@@ -93,6 +93,7 @@ const LoggerClass = (): new () => WinstonLogger => (class {} as never);
 
 export class Logger extends LoggerClass() {
     private static FORCED_EXTRAS = {
+        app: serviceConfig.APP_NAME,
         service: serviceConfig.NAME,
     };
 

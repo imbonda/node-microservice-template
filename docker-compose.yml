@@ -1,0 +1,64 @@
+version: '3.9'
+
+x-prod-env-variables: &prod-env-variables
+  NODE_ENV: prod
+  LOGGER_SILENT: false
+  LOGGER_LEVEL: verbose
+  LOGGER_FILE_TRANSPORT: true
+  # /var/log/ is owned by "root" since it is mounted via the volume.
+  # We create a sub-directory so that the app running with lower permissions can write there.
+  LOGGER_FILE_DIR_PATH: /var/log
+
+x-node-microservice: &node-microservice-service
+  deploy:
+    replicas: 1
+  env_file:
+    - .env
+  environment:
+    <<: *prod-env-variables
+  volumes:
+    - ./logs/:/var/log
+  logging:
+    driver: json-file
+    options:
+      max-size: 100m
+      max-file: 1
+  cap_add:
+    # Required for puppeteer to run the browser in sandbox mode.
+    - SYS_ADMIN
+  depends_on:
+    - log-forwarder
+  image: node-microservice:1.0.0
+  restart: unless-stopped
+
+x-log-forwarder: &log-forwarder-service
+  build:
+    context: .
+    dockerfile: logging/Dockerfile
+  image: log-forwarder:1.0.0
+  container_name: log-forwarder
+  volumes:
+    - ./logs/:/var/log/app
+  env_file:
+    - ./logging/.env
+  environment:
+    LOG_DIR: /var/log/app
+    LOG_FILE_PATTERN: '*.log'
+  stop_grace_period: 10s
+
+services:
+  node-microservice:
+    <<: *node-microservice-service
+    build:
+      # Note:
+      # The image is built only once by running "docker compose build".
+      # The image is then referred by other services via the name tag. 
+      context: .
+      dockerfile: Dockerfile
+    container_name: node-microservice
+    command: >
+      node -r ./dist/lib/tracer.js ./dist/main.js
+
+  log-forwarder:
+    <<: *log-forwarder-service
+  

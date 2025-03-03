@@ -36,6 +36,7 @@ class Launcher {
             await this.service.setup();
         } catch (err) {
             this.logger.error(err);
+            return;
         }
         // Start up stage.
         try {

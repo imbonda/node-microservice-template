@@ -58,10 +58,13 @@ export const telegramConfig = {
 let serviceName: string;
 
 export const serviceConfig = {
+    APP_NAME: process.env.APP_NAME,
     NAME: serviceName,
 };
 
-const REQUIRED_CONFIGS: object[] = [];
+const REQUIRED_CONFIGS: object[] = [
+    /** Add required args. */
+];
 
 export function validateConfig() {
     REQUIRED_CONFIGS.forEach(validateSubConfig);
