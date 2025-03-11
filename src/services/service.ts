@@ -2,8 +2,10 @@
 import { trace, type Tracer } from '@opentelemetry/api';
 // Internal.
 import { serviceConfig } from '@/config';
+import { safe } from '@/lib/decorators';
 import { Logger } from '@/lib/logger';
 import {
+    type NotificationExtra,
     telegram,
     formatServiceState,
 } from '@/lib/notifications';
@@ -14,7 +16,10 @@ export enum ServiceState {
 }
 
 export abstract class Service {
-    protected notificationsQueue: string[];
+    protected notificationsQueue: {
+        message: string;
+        extra: NotificationExtra;
+     }[];
 
     protected logger: Logger;
 
@@ -50,18 +55,29 @@ export abstract class Service {
 
     protected async notify(
         message: string,
-        { queue } = { queue: false },
+        {
+            extra,
+            queue,
+        }: {
+            extra?: NotificationExtra;
+            queue: boolean;
+        } = {
+            queue: false,
+        },
     ): Promise<void> {
         if (queue) {
-            this.notificationsQueue.push(message);
+            this.notificationsQueue.push({ message, extra });
         } else {
-            await telegram.sendNotification(message);
+            await telegram.send(message, extra);
         }
     }
 
+    @safe({ silent: false })
     protected async flushAllNotification(): Promise<void> {
         await Promise.all(
-            this.notificationsQueue.map(telegram.sendNotification.bind(telegram)),
+            this.notificationsQueue.map(
+                ({ message, extra }) => telegram.send(message, extra),
+            ),
         );
         this.notificationsQueue = [];
     }
