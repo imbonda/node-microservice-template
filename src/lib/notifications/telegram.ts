@@ -7,7 +7,7 @@ import { Logger } from '@/lib/logger';
 
 interface ActionButton {
     text: string;
-    event: string;
+    command: string;
     param?: string;
 }
 
@@ -61,9 +61,9 @@ class Telegram {
                     reply_markup: {
                         inline_keyboard: keyboard.map(
                             (buttons: ActionButton[]) => buttons.map(
-                                ({ text, event, param }) => ({
+                                ({ text, command, param }) => ({
                                     text,
-                                    callback_data: this.buildEventData(event, param),
+                                    callback_data: this.buildCommandData(command, param),
                                 }),
                             ),
                         ),
@@ -74,10 +74,10 @@ class Telegram {
     }
 
     public on(
-        event: string,
+        command: string,
         callback: (arg: string) => Promise<ActionResult>,
     ): this {
-        this.bot.action(new RegExp(`^${event}_(.*)$`), async (ctx) => {
+        this.bot.action(new RegExp(`^${command}_(.*)$`), async (ctx) => {
             try {
                 const arg = ctx.match[1];
                 await ctx.answerCbQuery('Processing...');
@@ -97,9 +97,9 @@ class Telegram {
                         reply_markup: {
                             inline_keyboard: keyboard.map(
                                 (buttons: ActionButton[]) => buttons.map(
-                                    ({ text, param, event: nextEvent }) => ({
+                                    ({ text, param, command: nextCommand }) => ({
                                         text,
-                                        callback_data: this.buildEventData(nextEvent, param),
+                                        callback_data: this.buildCommandData(nextCommand, param),
                                     }),
                                 ),
                             ),
@@ -107,7 +107,14 @@ class Telegram {
                     }),
                 });
             } catch (err) {
-                this.logger.error(err);
+                try {
+                    await ctx.deleteMessage();
+                    await ctx.reply(err.toString());
+                } catch {
+                    /** empty */
+                } finally {
+                    this.logger.error(err);
+                }
             }
         });
         return this;
@@ -123,8 +130,8 @@ class Telegram {
     }
 
     // eslint-disable-next-line class-methods-use-this
-    public buildEventData(event: string, param: string): string {
-        return `${event}_${param}`;
+    public buildCommandData(command: string, param: string): string {
+        return `${command}_${param}`;
     }
 }
 

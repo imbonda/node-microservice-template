@@ -1,4 +1,5 @@
 // 3rd party.
+import { type Tracer } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
 // Internal.
 import type { Logger } from '@/lib/logger';
@@ -80,6 +81,50 @@ export function throttle(
         });
         const wrapped = limiter.wrap(originalMethod);
         descriptor.value = wrapped;
+        return descriptor;
+    };
+}
+
+interface TraceOptions {
+    name: string;
+    root: boolean;
+    sync?: boolean;
+}
+
+export function trace(
+    { name, root, sync }: TraceOptions,
+) {
+    return (
+        _target: unknown,
+        _propertyKey: string,
+        descriptor: PropertyDescriptor,
+    ) => {
+        const originalMethod = descriptor.value!;
+        if (sync) {
+            descriptor.value = function wrapper(...args: unknown[]) {
+                return (this as { tracer: Tracer }).tracer.startActiveSpan(
+                    name,
+                    { root },
+                    (span) => {
+                        try {
+                            return originalMethod.apply(this, args);
+                        } finally {
+                            span.end();
+                        }
+                    },
+                );
+            };
+        } else {
+            descriptor.value = function wrapper(...args: unknown[]) {
+                return (this as { tracer: Tracer }).tracer.startActiveSpan(
+                    name,
+                    { root },
+                    async (span) => originalMethod
+                        .apply(this, args)
+                        .finally(() => span.end()),
+                );
+            };
+        }
         return descriptor;
     };
 }
