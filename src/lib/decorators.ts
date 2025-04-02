@@ -3,6 +3,7 @@ import { type Tracer } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
 // Internal.
 import type { Logger } from '@/lib/logger';
+import { getRandomInRange } from '@/lib/utils';
 
 interface SafeOptions {
     defaultValue?: unknown,
@@ -80,6 +81,37 @@ export function throttle(
             }),
         });
         const wrapped = limiter.wrap(originalMethod);
+        descriptor.value = wrapped;
+        return descriptor;
+    };
+}
+
+interface RandomThrottleOptions {
+    minDelayMs: number;
+    maxDelayMs: number;
+}
+
+export function randomThrottle(
+    {
+        minDelayMs, maxDelayMs,
+    }: RandomThrottleOptions,
+) {
+    return (
+        _target: unknown,
+        _propertyKey: string,
+        descriptor: PropertyDescriptor,
+    ) => {
+        const originalMethod = descriptor.value!;
+        const limiter = new Bottleneck({
+            maxConcurrent: 1,
+            minTime: getRandomInRange(minDelayMs, maxDelayMs),
+            highWater: 0,
+            strategy: Bottleneck.strategy.OVERFLOW,
+        });
+        const wrapped = limiter.wrap(function wrapper(this: unknown, ...args: unknown[]) {
+            limiter.updateSettings({ minTime: getRandomInRange(minDelayMs, maxDelayMs) });
+            return originalMethod.apply(this, args);
+        });
         descriptor.value = wrapped;
         return descriptor;
     };

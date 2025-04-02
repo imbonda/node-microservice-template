@@ -8,7 +8,7 @@ import {
 import 'winston-daily-rotate-file';
 // Internal.
 import { logConfig, serviceConfig } from '@/config';
-import { isEmpty } from '@/lib/utils/utils';
+import { isEmpty } from '@/lib/utils';
 
 type ErrorWithStack = Error & { stack?: object };
 type ErrorWithCause = Error & { cause?: ErrorWithStack };
